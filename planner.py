@@ -164,14 +164,14 @@ def is_cell_walkable(grid, h, w, x, y):
 
 def neighbors_of_7(mapdata, h, w, x, y):
     neighbors = []
-    # if(is_cell_walkable(mapdata, h, w, x, y-1)):
-    #     neighbors.append((x, y-1))
+    if(is_cell_walkable(mapdata, h, w, x, y-1)):
+        neighbors.append((x, y-1))
     if(is_cell_walkable(mapdata, h, w, x-1, y)):
         neighbors.append((x-1, y))
     if(is_cell_walkable(mapdata, h, w, x+1, y)):
         neighbors.append((x+1, y))
-    if(is_cell_walkable(mapdata, h, w, x, y+1)):
-        neighbors.append((x, y+1))
+    # if(is_cell_walkable(mapdata, h, w, x, y+1)):
+    #     neighbors.append((x, y+1))
     if(is_cell_walkable(mapdata, h, w, x-1, y-1)):
         neighbors.append((x-1, y-1))
     if(is_cell_walkable(mapdata, h, w, x+1, y-1)):
@@ -272,7 +272,7 @@ def a_star(mapdata, height, width, start, goal, visualize=False):
         return []
     return reconstruct_path(goal, cameFrom)
 
-def display_grids(original, rotated, p1, p1_trans, p2, p2_trans, path_points, path_points_trans, conflict: bool, conflict_pos):
+def display_grids(original, rotated, wind_angle_degrees, p1, p1_trans, p2, p2_trans, path_points, path_points_trans, conflict: bool, conflict_pos):
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
     first_color='green'
@@ -288,6 +288,20 @@ def display_grids(original, rotated, p1, p1_trans, p2, p2_trans, path_points, pa
         path_points_trans.append(p2_trans)
 
     axes[0].imshow(original, cmap='Greys', interpolation='none')
+    axes[0].invert_yaxis()
+    center_x, center_y = np.array(original.shape) / 2
+
+    # Length of the arrow
+    arrow_length = min(original.shape) / 3
+
+    # Calculate arrow direction
+    angle_radians = np.radians(wind_angle_degrees)
+    dx = arrow_length * np.cos(angle_radians)
+    dy = arrow_length * np.sin(angle_radians)
+
+    # Draw the arrow
+    axes[0].arrow(center_x, center_y, dx, -dy, head_width=0.5, head_length=0.5, fc='blue', ec='blue')
+
     axes[0].plot(p1[0], p1[1], 'bo')
     axes[0].plot(p2[0], p2[1], 'ro')
     axes[0].plot([p[0] for p in path_points], [p[1] for p in path_points], color=first_color)
@@ -297,6 +311,7 @@ def display_grids(original, rotated, p1, p1_trans, p2, p2_trans, path_points, pa
     #axes[0].axis('off')
 
     axes[1].imshow(rotated, cmap='Greys', interpolation='none')
+    axes[1].invert_yaxis()
     axes[1].plot(p1_trans[0], p1_trans[1], 'bo')
     axes[1].plot(p2_trans[0], p2_trans[1], 'ro')
     axes[1].plot([p[0] for p in path_points_trans], [p[1] for p in path_points_trans], color=second_color)
@@ -304,30 +319,6 @@ def display_grids(original, rotated, p1, p1_trans, p2, p2_trans, path_points, pa
     #axes[1].axis('off')
 
     plt.show()
-
-def rotate_and_scale_point(x, y, angle_rad, original_width, original_height, new_width, new_height):
-    # Calculate the center of the original and new grids
-    center_x_orig, center_y_orig = original_width / 2, original_height / 2
-    center_x_new, center_y_new = new_width / 2, new_height / 2
-
-    # Translate point to origin
-    translated_x = x - center_x_orig
-    translated_y = y - center_y_orig
-
-    # Apply rotation
-    cos_angle = np.cos(angle_rad)
-    sin_angle = np.sin(angle_rad)
-    rotated_x = translated_x * cos_angle - translated_y * sin_angle
-    rotated_y = translated_y * sin_angle + translated_y * cos_angle
-
-    # Scale and translate point back
-    scale_x = new_width / original_width
-    scale_y = new_height / original_height
-
-    final_x = rotated_x * scale_x + center_x_new
-    final_y = rotated_y * scale_y + center_y_new
-
-    return final_x, final_y
 
 def rotate_and_scale(pt, radians, origin, h, w, h_new, w_new):
     x, y = pt
@@ -360,9 +351,13 @@ def main():
     x=100
     y=100
     grid = generate_grid(x, y, 30, 100)
-    angle_deg = 30
-    angle_rad = math.radians(angle_deg)
-    rotated_grid = nd.rotate(grid, angle_deg, reshape=True, order=0, mode='constant', cval=1.0)
+    wind_angle_deg = 10
+
+    #top-down, and Scipy's rotate goes clockwise
+    map_angle_deg = 90+wind_angle_deg
+    wind_display_angle_deg = -wind_angle_deg
+    map_angle_rad = math.radians(map_angle_deg)
+    rotated_grid = nd.rotate(grid, map_angle_deg, reshape=True, order=0, mode='constant', cval=1.0)
     rotated_grid = (rotated_grid > 0.5).astype(int)
     
     h, w = grid.shape[:2]
@@ -370,16 +365,25 @@ def main():
     origin = (w/2, h/2)
 
     #create points
-    p1 = (20,95)#random_unblocked_point(grid)
-    print(p1)
-    p2 = (80,5)#random_unblocked_point(grid)
+    p1 = (95, 55)#random_unblocked_point(grid)
+    p2 = (5,45)#random_unblocked_point(grid)
 
     #rotate
-    p1_new = rotate_and_scale(p1, angle_rad, origin, h, w, h_new, w_new)
-    p2_new = rotate_and_scale(p2, angle_rad, origin, h, w, h_new, w_new)
+    p1_new = rotate_and_scale(p1, map_angle_rad, origin, h, w, h_new, w_new)
+    p2_new = rotate_and_scale(p2, map_angle_rad, origin, h, w, h_new, w_new)
 
-    #scale
-    
+    a=p2[0]-p1[0]
+    b=p2[1]-p1[1]
+    angle = (math.degrees(math.atan2(b, a))+360)%360
+
+    # a = math.atan2(p1[1], p1[0])
+    # b = math.atan2(p2[1], p2[0])
+    # angle = math.degrees(a-b)%360
+    print("Angle: "+str(angle))
+
+    print("Dist: "+str(distance(p1[0], p1[1], p2[0], p2[1])))
+    print("X diff: "+str(p2[0]-p1[0]))
+
     conflict_pos = hasLOS(grid, p1, p2)
     collision = False
     if(conflict_pos is not None):
@@ -390,7 +394,7 @@ def main():
         path = a_star(rotated_grid, h_new, w_new, p1_new, p2_new, False)
 
     #display
-    display_grids(grid, rotated_grid, p1, p1_new, p2, p2_new, path_points=[], path_points_trans=path, conflict=collision, conflict_pos=conflict_pos)
+    display_grids(grid, rotated_grid, wind_display_angle_deg, p1, p1_new, p2, p2_new, path_points=[], path_points_trans=path, conflict=collision, conflict_pos=conflict_pos)
 
 if __name__ == "__main__":
     main()
