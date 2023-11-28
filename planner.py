@@ -317,6 +317,8 @@ def display_grids(original, rotated, wind_angle_degrees, p1, p1_trans, p2, p2_tr
     axes[1].plot([p[0] for p in path_points_trans], [p[1] for p in path_points_trans], color=second_color)
     axes[1].set_title('Rotated Grid')
     #axes[1].axis('off')
+    
+    fig.canvas.mpl_connect('key_press_event', lambda event: on_key_press(event, plt))
 
     plt.show()
 
@@ -347,11 +349,34 @@ def random_unblocked_point(grid):
 
     return tuple(random_index)
 
+def is_within_30_degrees(A, B):
+    # Normalize angles to 0 to 360 degrees
+    A = A % 360
+    B = B % 360
+
+    # Compute the absolute difference
+    difference = abs(A - B)
+
+    # Adjust for angles crossing 0 degrees
+    if difference > 180:
+        difference = 360 - difference
+
+    # Check if the difference is within 30 degrees
+    return difference <= 30
+
+def opposite_angle(angle):
+    return (angle + 180) % 360
+
+def on_key_press(event, plt):
+    if event.key == ' ':
+        plt.close(event.canvas.figure)
+        main()
+
 def main():
     x=100
     y=100
     grid = generate_grid(x, y, 30, 100)
-    wind_angle_deg = 10
+    wind_angle_deg = random.randrange(360)# 10
 
     #top-down, and Scipy's rotate goes clockwise
     map_angle_deg = 90+wind_angle_deg
@@ -365,8 +390,8 @@ def main():
     origin = (w/2, h/2)
 
     #create points
-    p1 = (95, 55)#random_unblocked_point(grid)
-    p2 = (5,45)#random_unblocked_point(grid)
+    p1 = random_unblocked_point(grid)#(95, 55)
+    p2 = random_unblocked_point(grid)#(5,45)
 
     #rotate
     p1_new = rotate_and_scale(p1, map_angle_rad, origin, h, w, h_new, w_new)
@@ -384,13 +409,17 @@ def main():
     print("Dist: "+str(distance(p1[0], p1[1], p2[0], p2[1])))
     print("X diff: "+str(p2[0]-p1[0]))
 
-    conflict_pos = hasLOS(grid, p1, p2)
+    wind_blocked = False
     collision = False
+    conflict_pos = None
+    conflict_pos = hasLOS(grid, p1, p2)
     if(conflict_pos is not None):
         collision = True
+    if(is_within_30_degrees(wind_angle_deg, opposite_angle(angle))):
+        wind_blocked = True
 
     path = []
-    if(collision):
+    if(wind_blocked or collision):
         path = a_star(rotated_grid, h_new, w_new, p1_new, p2_new, False)
 
     #display
