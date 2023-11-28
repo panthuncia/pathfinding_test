@@ -7,6 +7,17 @@ import math
 import scipy.ndimage as nd 
 from collections import defaultdict 
 from PriorityQueue import PriorityQueue
+from typing import List
+
+TURN_WEIGHT = 100
+
+# class Node:
+#     x: int
+#     y: int
+#     neighbors: List[__class__]
+#     def __init__(self, x: int, y: int):
+#         self.x = x
+#         self.y = y
 
 def create_blob(grid, start_x, start_y, blob_size):
     directions = [(1,0), (0,1), (-1,0), (0,-1)]
@@ -147,21 +158,20 @@ def distance(x1, y1, x2, y2):
     return math.sqrt(x2x1*x2x1 + y2y1*y2y1)
 
 def is_cell_walkable(grid, h, w, x, y):
-    print(str((x, y)))
     if(x>=0 and y>=0 and x<w and y<h and grid[y][x]<=0.5):
         return True
     return False
 
 def neighbors_of_7(mapdata, h, w, x, y):
     neighbors = []
-    if(is_cell_walkable(mapdata, h, w, x, y-1)):
-        neighbors.append((x, y-1))
+    # if(is_cell_walkable(mapdata, h, w, x, y-1)):
+    #     neighbors.append((x, y-1))
     if(is_cell_walkable(mapdata, h, w, x-1, y)):
         neighbors.append((x-1, y))
     if(is_cell_walkable(mapdata, h, w, x+1, y)):
         neighbors.append((x+1, y))
-    # if(is_cell_walkable(mapdata, h, w, x, y+1)):
-    #     neighbors.append((x, y+1))
+    if(is_cell_walkable(mapdata, h, w, x, y+1)):
+        neighbors.append((x, y+1))
     if(is_cell_walkable(mapdata, h, w, x-1, y-1)):
         neighbors.append((x-1, y-1))
     if(is_cell_walkable(mapdata, h, w, x+1, y-1)):
@@ -172,6 +182,18 @@ def neighbors_of_7(mapdata, h, w, x, y):
         neighbors.append((x+1, y+1))
     return neighbors
 
+# def neighbors_of_3(mapdata, h, w, x, y):
+#     neighbors = []
+#     if(is_cell_walkable(mapdata, h, w, x, y-1)):
+#         neighbors.append((x, y-1))
+#     if(is_cell_walkable(mapdata, h, w, x-1, y)):
+#         neighbors.append((x-1, y))
+#     if(is_cell_walkable(mapdata, h, w, x+1, y)):
+#         neighbors.append((x+1, y))
+#     if(is_cell_walkable(mapdata, h, w, x, y+1)):
+#         neighbors.append((x, y+1))
+#     return neighbors
+
 def reconstruct_path(end, cameFrom: dict):
     path = []
     path.append(end)
@@ -179,6 +201,24 @@ def reconstruct_path(end, cameFrom: dict):
         end = cameFrom.get(end)
         path.insert(0, end)
     return path
+
+def turn_penalty(previous, current, next):
+    if current[0] - previous[0] != 0 and next[0] - current[0] != 0:
+        slope1 = (current[1] - previous[1]) / (current[0] - previous[0])
+        slope2 = (next[1] - current[1]) / (next[0] - current[0])
+        if math.isclose(slope1, slope2):
+            return 0
+        else:
+            return TURN_WEIGHT
+    else:
+        # If the x-coordinates are the same, the points are collinear if
+        # they all have the same x-coordinate
+        if previous[0] == current[0] == next[0]:
+            return 0
+        elif previous[1] == current[1] == next[1]:
+            return 0
+        else:
+            return TURN_WEIGHT
 
 def a_star(mapdata, height, width, start, goal, visualize=False):
     ### REQUIRED CREDIT
@@ -212,14 +252,14 @@ def a_star(mapdata, height, width, start, goal, visualize=False):
         for node in neighbors:
             if node in closed:
                 continue
-            tentative_gscore = gScore[current]+distance(node[0], node[1], current[0], current[1])
+            current_turn_penalty = 0
+            if current in cameFrom:
+                current_turn_penalty = turn_penalty(cameFrom[current], current, node)
+            tentative_gscore = gScore[current]+distance(node[0], node[1], current[0], current[1])+current_turn_penalty
             if(tentative_gscore<gScore[node]):
                 cameFrom[node] = current
                 gScore[node] = tentative_gscore
                 #currently just uses distance as a heuristic, which is redundant. Code exists anyway, in case we want a more complex cost-avoidance system
-                danger = mapdata[node[0]][node[1]]
-                if(danger<0):
-                    danger=50
                 f = tentative_gscore+distance(node[0], node[1], goal[0], goal[1])
                 fScore[node] = f
                 if node in open:
@@ -229,7 +269,7 @@ def a_star(mapdata, height, width, start, goal, visualize=False):
                 closed.add(node)
     if(openSet.empty()):
         print("No path found")
-        return False
+        return []
     return reconstruct_path(goal, cameFrom)
 
 def display_grids(original, rotated, p1, p1_trans, p2, p2_trans, path_points, path_points_trans, conflict: bool, conflict_pos):
@@ -248,7 +288,7 @@ def display_grids(original, rotated, p1, p1_trans, p2, p2_trans, path_points, pa
         path_points_trans.append(p2_trans)
 
     axes[0].imshow(original, cmap='Greys', interpolation='none')
-    axes[0].plot(p1[0], p1[1], 'ro')
+    axes[0].plot(p1[0], p1[1], 'bo')
     axes[0].plot(p2[0], p2[1], 'ro')
     axes[0].plot([p[0] for p in path_points], [p[1] for p in path_points], color=first_color)
     if conflict_pos is not None:
@@ -257,7 +297,7 @@ def display_grids(original, rotated, p1, p1_trans, p2, p2_trans, path_points, pa
     #axes[0].axis('off')
 
     axes[1].imshow(rotated, cmap='Greys', interpolation='none')
-    axes[1].plot(p1_trans[0], p1_trans[1], 'ro')
+    axes[1].plot(p1_trans[0], p1_trans[1], 'bo')
     axes[1].plot(p2_trans[0], p2_trans[1], 'ro')
     axes[1].plot([p[0] for p in path_points_trans], [p[1] for p in path_points_trans], color=second_color)
     axes[1].set_title('Rotated Grid')
@@ -319,7 +359,7 @@ def random_unblocked_point(grid):
 def main():
     x=100
     y=100
-    grid = generate_grid(x, y, 50, 100)
+    grid = generate_grid(x, y, 30, 100)
     angle_deg = 30
     angle_rad = math.radians(angle_deg)
     rotated_grid = nd.rotate(grid, angle_deg, reshape=True, order=0, mode='constant', cval=1.0)
@@ -330,9 +370,9 @@ def main():
     origin = (w/2, h/2)
 
     #create points
-    p1 = random_unblocked_point(grid)
+    p1 = (20,95)#random_unblocked_point(grid)
     print(p1)
-    p2 = random_unblocked_point(grid)
+    p2 = (80,5)#random_unblocked_point(grid)
 
     #rotate
     p1_new = rotate_and_scale(p1, angle_rad, origin, h, w, h_new, w_new)
