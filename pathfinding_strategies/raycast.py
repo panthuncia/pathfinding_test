@@ -104,9 +104,13 @@ def hasLOS(grid, a, b):
     """
     #+0.5 on each direction to account for center-cell offset
     # x, y = PathPlanner.dda(a, b)
+    h, w = grid.shape[:2]
     x, y = _raycast(a[0], a[1], b[0], b[1])
     for i in range(len(x)):
+        if(y[i]<0 or y[i]>=h or x[i]<0 or x[i]>=w):
+            print("Raycast out of bounds: "+str((x[i], y[i])))
+            return (x[i], y[i])
         if(grid[y[i]][x[i]]>0.5):
-            print("conflict on "+str((x[i], y[i])))
+            print("Raycast conflict on: "+str((x[i], y[i])))
             return (x[i], y[i])
     return None

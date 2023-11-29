@@ -8,6 +8,7 @@ import scipy.ndimage as nd
 from typing import List
 
 from pathfinding_strategies.linear_raycast import LinearRaycastPathfindingStrategy
+from pathfinding_strategies.one_tack_raycast import TackRaycastPathfindingStrategy
 from pathfinding_strategies.a_star import AStarPathfindingStrategy
 
 def create_blob(grid, start_x, start_y, blob_size):
@@ -92,7 +93,7 @@ def random_unblocked_point(grid):
     unblocked_tuples = [tuple(index) for index in unblocked_indices]
     # Choose a random index
     random_index = random.choice(unblocked_tuples)
-
+    print(random_index)
     return tuple(random_index)
 
 def is_within_30_degrees(A, B):
@@ -121,8 +122,9 @@ def on_key_press(event, plt):
 def main():
     x=100
     y=100
-    grid = generate_grid(x, y, 30, 100)
+    grid = generate_grid(x, y, 0, 100)
     wind_angle_deg = random.randrange(360)# 10
+    #wind_angle_deg = 330
 
     #top-down, and Scipy's rotate goes clockwise
     map_angle_deg = 90+wind_angle_deg
@@ -139,6 +141,8 @@ def main():
     #create points
     p1 = random_unblocked_point(grid)#(95, 55)
     p2 = random_unblocked_point(grid)#(5,45)
+    #p1 = (45, 10)
+    #p2 = (6,20)
 
     #rotate
     p1_proj = rotate_and_scale(p1, map_angle_rad, origin, h, w, h_new, w_new)
@@ -160,15 +164,22 @@ def main():
     if(is_within_30_degrees(wind_angle_deg, opposite_angle(angle))):
         print("Wind blocks direct path")
         wind_blocked = True
-
-    path = LinearRaycastPathfindingStrategy.solve(grid, p1, p2)
-    path_trans = [rotate_and_scale(p, map_angle_rad, origin, h, w, h_new, w_new) for p in path]
-    collision = False
-    if len(path)==0:
-        print("raycast failed")
-        collision = True
-
-    if wind_blocked or collision:
+    if wind_blocked:
+        path = TackRaycastPathfindingStrategy.solve(grid, p1, p2, wind_angle_rad=math.radians(wind_angle_deg), no_go_angle_rad= math.radians(30))
+        path_trans = [rotate_and_scale(p, map_angle_rad, origin, h, w, h_new, w_new) for p in path]
+        collision = False
+        if len(path)==0:
+            print("tack raycast failed")
+            collision = True
+    else:
+        path = LinearRaycastPathfindingStrategy.solve(grid, p1, p2)
+        path_trans = [rotate_and_scale(p, map_angle_rad, origin, h, w, h_new, w_new) for p in path]
+        collision = False
+        if len(path)==0:
+            print("Direct raycast failed")
+            collision = True
+    
+    if collision:
         print("Running A*")
         path_trans = AStarPathfindingStrategy.solve(rotated_grid, p1_proj, p2_proj)
         #un-rotate
