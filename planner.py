@@ -9,7 +9,7 @@ from collections import defaultdict
 from PriorityQueue import PriorityQueue
 from typing import List
 
-TURN_WEIGHT = 100
+TURN_WEIGHT = 5
 
 # class Node:
 #     x: int
