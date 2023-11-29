@@ -6,7 +6,7 @@ import random
 import math
 import scipy.ndimage as nd 
 from collections import defaultdict 
-from PriorityQueue import PriorityQueue
+from priority_queue import PriorityQueue
 from typing import List
 
 TURN_WEIGHT = 5
@@ -423,7 +423,7 @@ def main():
         path = a_star(rotated_grid, h_new, w_new, p1_new, p2_new, False)
 
     #display
-    display_grids(grid, rotated_grid, wind_display_angle_deg, p1, p1_new, p2, p2_new, path_points=[], path_points_trans=path, conflict=collision, conflict_pos=conflict_pos)
+    display_grids(original=grid, rotated=rotated_grid, wind_angle_degrees=wind_display_angle_deg, p1=p1, p1_trans=p1_new, p2=p2, p2_trans=p2_new, path_points=[], path_points_trans=path, conflict=collision, conflict_pos=conflict_pos)
 
 if __name__ == "__main__":
     main()
