@@ -5,19 +5,10 @@ import matplotlib.pyplot as plt
 import random
 import math
 import scipy.ndimage as nd 
-from collections import defaultdict 
-from priority_queue import PriorityQueue
 from typing import List
 
-TURN_WEIGHT = 5
-
-# class Node:
-#     x: int
-#     y: int
-#     neighbors: List[__class__]
-#     def __init__(self, x: int, y: int):
-#         self.x = x
-#         self.y = y
+from pathfinding_strategies.linear_raycast import LinearRaycastPathfindingStrategy
+from pathfinding_strategies.a_star import AStarPathfindingStrategy
 
 def create_blob(grid, start_x, start_y, blob_size):
     directions = [(1,0), (0,1), (-1,0), (0,-1)]
@@ -152,127 +143,7 @@ def hasLOS(grid, a, b):
             return (x[i], y[i])
     return None
 
-def distance(x1, y1, x2, y2):
-    x2x1 = x2-x1
-    y2y1 = y2-y1
-    return math.sqrt(x2x1*x2x1 + y2y1*y2y1)
-
-def is_cell_walkable(grid, h, w, x, y):
-    if(x>=0 and y>=0 and x<w and y<h and grid[y][x]<=0.5):
-        return True
-    return False
-
-def neighbors_of_7(mapdata, h, w, x, y):
-    neighbors = []
-    if(is_cell_walkable(mapdata, h, w, x, y-1)):
-        neighbors.append((x, y-1))
-    if(is_cell_walkable(mapdata, h, w, x-1, y)):
-        neighbors.append((x-1, y))
-    if(is_cell_walkable(mapdata, h, w, x+1, y)):
-        neighbors.append((x+1, y))
-    # if(is_cell_walkable(mapdata, h, w, x, y+1)):
-    #     neighbors.append((x, y+1))
-    if(is_cell_walkable(mapdata, h, w, x-1, y-1)):
-        neighbors.append((x-1, y-1))
-    if(is_cell_walkable(mapdata, h, w, x+1, y-1)):
-        neighbors.append((x+1, y-1))
-    if(is_cell_walkable(mapdata, h, w, x-1, y+1)):
-        neighbors.append((x-1, y+1))
-    if(is_cell_walkable(mapdata, h, w, x+1, y+1)):
-        neighbors.append((x+1, y+1))
-    return neighbors
-
-# def neighbors_of_3(mapdata, h, w, x, y):
-#     neighbors = []
-#     if(is_cell_walkable(mapdata, h, w, x, y-1)):
-#         neighbors.append((x, y-1))
-#     if(is_cell_walkable(mapdata, h, w, x-1, y)):
-#         neighbors.append((x-1, y))
-#     if(is_cell_walkable(mapdata, h, w, x+1, y)):
-#         neighbors.append((x+1, y))
-#     if(is_cell_walkable(mapdata, h, w, x, y+1)):
-#         neighbors.append((x, y+1))
-#     return neighbors
-
-def reconstruct_path(end, cameFrom: dict):
-    path = []
-    path.append(end)
-    while end in cameFrom:
-        end = cameFrom.get(end)
-        path.insert(0, end)
-    return path
-
-def turn_penalty(previous, current, next):
-    if current[0] - previous[0] != 0 and next[0] - current[0] != 0:
-        slope1 = (current[1] - previous[1]) / (current[0] - previous[0])
-        slope2 = (next[1] - current[1]) / (next[0] - current[0])
-        if math.isclose(slope1, slope2):
-            return 0
-        else:
-            return TURN_WEIGHT
-    else:
-        # If the x-coordinates are the same, the points are collinear if
-        # they all have the same x-coordinate
-        if previous[0] == current[0] == next[0]:
-            return 0
-        elif previous[1] == current[1] == next[1]:
-            return 0
-        else:
-            return TURN_WEIGHT
-
-def a_star(mapdata, height, width, start, goal, visualize=False):
-    ### REQUIRED CREDIT
-    print("Executing A* from (%d,%d) to (%d,%d)" % (start[0], start[1], goal[0], goal[1]))
-    # For node n, cameFrom[n] is the node immediately preceding it on the cheapest path from the start to n currently known.
-    cameFrom = {}
-    #map with default value of Infinity
-    gScore = defaultdict(lambda: float('inf'))
-    #map with default value of Infinity
-    fScore = defaultdict(lambda: float('inf'))
-    openSet = PriorityQueue()
-    open = set()
-    closed = set()
-    closed_list = []
-    current = start
-    gScore[start]=0
-    start_f = distance(current[0], current[1], goal[0], goal[1])
-    fScore[start]= start_f
-    #cursed
-    if(current == goal):
-        return reconstruct_path(goal, cameFrom)
-    else:
-        openSet.put(current, start_f)
-        open.add(current)
-    while current != goal and not openSet.empty():
-        # if visualize:
-        #     self.showAstarPoints(mapdata, closed_list, openSet.elements)
-        current = openSet.get()
-        open.remove(current)
-        neighbors = neighbors_of_7(mapdata, height, width, current[0], current[1])
-        for node in neighbors:
-            if node in closed:
-                continue
-            current_turn_penalty = 0
-            if current in cameFrom:
-                current_turn_penalty = turn_penalty(cameFrom[current], current, node)
-            tentative_gscore = gScore[current]+distance(node[0], node[1], current[0], current[1])+current_turn_penalty
-            if(tentative_gscore<gScore[node]):
-                cameFrom[node] = current
-                gScore[node] = tentative_gscore
-                #currently just uses distance as a heuristic, which is redundant. Code exists anyway, in case we want a more complex cost-avoidance system
-                f = tentative_gscore+distance(node[0], node[1], goal[0], goal[1])
-                fScore[node] = f
-                if node in open:
-                    openSet.remove(node)
-                open.add(node)
-                openSet.put(node, f)
-                closed.add(node)
-    if(openSet.empty()):
-        print("No path found")
-        return []
-    return reconstruct_path(goal, cameFrom)
-
-def display_grids(original, rotated, wind_angle_degrees, p1, p1_trans, p2, p2_trans, path_points, path_points_trans, conflict: bool, conflict_pos):
+def display_grids(original, rotated, wind_angle_degrees, p1, p1_trans, p2, p2_trans, path_points, path_points_trans, conflict: bool, conflict_pos = None):
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
     first_color='green'
@@ -282,10 +153,6 @@ def display_grids(original, rotated, wind_angle_degrees, p1, p1_trans, p2, p2_tr
 
     path_points.append(p1)
     path_points.append(p2)
-
-    if not conflict:
-        path_points_trans.append(p1_trans)
-        path_points_trans.append(p2_trans)
 
     axes[0].imshow(original, cmap='Greys', interpolation='none')
     axes[0].invert_yaxis()
@@ -394,8 +261,8 @@ def main():
     p2 = random_unblocked_point(grid)#(5,45)
 
     #rotate
-    p1_new = rotate_and_scale(p1, map_angle_rad, origin, h, w, h_new, w_new)
-    p2_new = rotate_and_scale(p2, map_angle_rad, origin, h, w, h_new, w_new)
+    p1_proj = rotate_and_scale(p1, map_angle_rad, origin, h, w, h_new, w_new)
+    p2_proj = rotate_and_scale(p2, map_angle_rad, origin, h, w, h_new, w_new)
 
     a=p2[0]-p1[0]
     b=p2[1]-p1[1]
@@ -404,26 +271,27 @@ def main():
     # a = math.atan2(p1[1], p1[0])
     # b = math.atan2(p2[1], p2[0])
     # angle = math.degrees(a-b)%360
-    print("Angle: "+str(angle))
+    # print("Angle: "+str(angle))
 
-    print("Dist: "+str(distance(p1[0], p1[1], p2[0], p2[1])))
-    print("X diff: "+str(p2[0]-p1[0]))
+    # print("Dist: "+str(distance(p1[0], p1[1], p2[0], p2[1])))
+    # print("X diff: "+str(p2[0]-p1[0]))
 
     wind_blocked = False
-    collision = False
-    conflict_pos = None
-    conflict_pos = hasLOS(grid, p1, p2)
-    if(conflict_pos is not None):
-        collision = True
     if(is_within_30_degrees(wind_angle_deg, opposite_angle(angle))):
         wind_blocked = True
 
-    path = []
-    if(wind_blocked or collision):
-        path = a_star(rotated_grid, h_new, w_new, p1_new, p2_new, False)
+    path = LinearRaycastPathfindingStrategy.solve(grid, p1, p2)
+    collision = False
+    if len(path)==0:
+        collision = True
+    else:
+        #Just for display on rotated grid
+        path = [p1_proj, p2_proj]
 
+    if wind_blocked or collision:
+        path = AStarPathfindingStrategy.solve(rotated_grid, p1_proj, p2_proj)
     #display
-    display_grids(original=grid, rotated=rotated_grid, wind_angle_degrees=wind_display_angle_deg, p1=p1, p1_trans=p1_new, p2=p2, p2_trans=p2_new, path_points=[], path_points_trans=path, conflict=collision, conflict_pos=conflict_pos)
+    display_grids(original=grid, rotated=rotated_grid, wind_angle_degrees=wind_display_angle_deg, p1=p1, p1_trans=p1_proj, p2=p2, p2_trans=p2_proj, path_points=[], path_points_trans=path, conflict=collision)
 
 if __name__ == "__main__":
     main()
