@@ -6,10 +6,12 @@ import random
 import math
 import scipy.ndimage as nd 
 from typing import List
+import time
 
 from pathfinding_strategies.linear_raycast import LinearRaycastPathfindingStrategy
 from pathfinding_strategies.one_tack_raycast import TackRaycastPathfindingStrategy
 from pathfinding_strategies.a_star import AStarPathfindingStrategy
+from pathfinding_strategies.jump_point_search import JPSPathfindingStrategy
 
 def create_blob(grid, start_x, start_y, blob_size):
     directions = [(1,0), (0,1), (-1,0), (0,-1)]
@@ -52,7 +54,7 @@ def display_grids(original, rotated, wind_angle_degrees, path_points, path_point
     dy = arrow_length * np.sin(angle_radians)
 
     # Draw the arrow
-    axes[0].arrow(center_x, center_y, dx, -dy, head_width=3, head_length=3, fc='blue', ec='blue')
+    axes[0].arrow(center_x, center_y, dx, -dy, head_width=30, head_length=30, fc='blue', ec='blue')
 
     if len(path_points)>0:
         axes[0].plot(path_points[0][0], path_points[0][1], 'bo')
@@ -120,17 +122,19 @@ def on_key_press(event, plt):
         main()
 
 def main():
-    x=100
-    y=100
-    grid = generate_grid(x, y, 0, 100)
-    wind_angle_deg = random.randrange(360)# 10
-    #wind_angle_deg = 330
+    x=1000
+    y=1000
+    grid = generate_grid(x, y, 0, 1000)
+    #wind_angle_deg = random.randrange(360)# 10
+    wind_angle_deg = 330
 
     #top-down, and Scipy's rotate goes clockwise
     map_angle_deg = 90+wind_angle_deg
     wind_display_angle_deg = -wind_angle_deg
     map_angle_rad = math.radians(map_angle_deg)
+    before = time.process_time()
     rotated_grid = nd.rotate(grid, map_angle_deg, reshape=True, order=0, mode='constant', cval=1.0)
+    print("rotate time: "+str(time.process_time()-before))
     rotated_grid = (rotated_grid > 0.5).astype(int)
     
     h, w = grid.shape[:2]
@@ -139,10 +143,10 @@ def main():
     new_origin = (w_new/2, h_new/2)
 
     #create points
-    p1 = random_unblocked_point(grid)#(95, 55)
-    p2 = random_unblocked_point(grid)#(5,45)
-    #p1 = (45, 10)
-    #p2 = (6,20)
+    #p1 = random_unblocked_point(grid)#(95, 55)
+    #p2 = random_unblocked_point(grid)#(5,45)
+    p1 = (45, 10)
+    p2 = (6,20)
 
     #rotate
     p1_proj = rotate_and_scale(p1, map_angle_rad, origin, h, w, h_new, w_new)
@@ -165,23 +169,29 @@ def main():
         print("Wind blocks direct path")
         wind_blocked = True
     if wind_blocked:
+        before = time.process_time()
         path = TackRaycastPathfindingStrategy.solve(grid, p1, p2, wind_angle_rad=math.radians(wind_angle_deg), no_go_angle_rad= math.radians(30))
+        print("Tack raycast time: "+str(time.process_time()-before))
         path_trans = [rotate_and_scale(p, map_angle_rad, origin, h, w, h_new, w_new) for p in path]
         collision = False
         if len(path)==0:
             print("tack raycast failed")
             collision = True
     else:
+        before = time.process_time()
         path = LinearRaycastPathfindingStrategy.solve(grid, p1, p2)
+        print("Linear raycast time: "+str(time.process_time()-before))
         path_trans = [rotate_and_scale(p, map_angle_rad, origin, h, w, h_new, w_new) for p in path]
         collision = False
         if len(path)==0:
             print("Direct raycast failed")
             collision = True
-    
+    collision = True
     if collision:
         print("Running A*")
+        before = time.process_time()
         path_trans = AStarPathfindingStrategy.solve(rotated_grid, p1_proj, p2_proj)
+        print("AStar time: "+str(time.process_time()-before))
         #un-rotate
         path = [rotate_and_scale(p, -map_angle_rad, new_origin, h_new, w_new, h, w) for p in path_trans]
     #display

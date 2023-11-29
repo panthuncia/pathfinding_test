@@ -84,7 +84,7 @@ class AStarPathfindingStrategy(PathfindingStrategyInterface):
         gScore[start]=0
         start_f = distance(current[0], current[1], goal[0], goal[1])
         fScore[start]= start_f
-        #cursed
+        num_expanded = 0
         if(current == goal):
             return reconstruct_path(goal, cameFrom)
         else:
@@ -104,6 +104,7 @@ class AStarPathfindingStrategy(PathfindingStrategyInterface):
                     current_turn_penalty = turn_penalty(cameFrom[current], current, node)
                 tentative_gscore = gScore[current]+distance(node[0], node[1], current[0], current[1])+current_turn_penalty
                 if(tentative_gscore<gScore[node]):
+                    num_expanded+=1
                     cameFrom[node] = current
                     gScore[node] = tentative_gscore
                     #currently just uses distance as a heuristic, which is redundant. Code exists anyway, in case we want a more complex cost-avoidance system
@@ -117,4 +118,5 @@ class AStarPathfindingStrategy(PathfindingStrategyInterface):
         if(openSet.empty()):
             print("No path found")
             return []
+        print("num expanded: "+str(num_expanded))
         return reconstruct_path(goal, cameFrom)
