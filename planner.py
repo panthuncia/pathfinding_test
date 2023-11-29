@@ -30,19 +30,16 @@ def generate_grid(width, height, num_obstacles, max_blob_size):
 
     return grid
 
-def display_grids(original, rotated, wind_angle_degrees, p1, p1_trans, p2, p2_trans, path_points, path_points_trans, conflict: bool, conflict_pos = None):
+def display_grids(original, rotated, wind_angle_degrees, path_points, path_points_trans):
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-
-    first_color='green'
-    second_color = 'green'
-    if(conflict):
-        first_color = 'red'
-
-    path_points.append(p1)
-    path_points.append(p2)
 
     axes[0].imshow(original, cmap='Greys', interpolation='none')
     axes[0].invert_yaxis()
+    axes[0].set_title('Original Grid')
+    
+    axes[1].imshow(rotated, cmap='Greys', interpolation='none')
+    axes[1].invert_yaxis()
+    axes[1].set_title('Rotated Grid')
     center_x, center_y = np.array(original.shape) / 2
 
     # Length of the arrow
@@ -54,23 +51,19 @@ def display_grids(original, rotated, wind_angle_degrees, p1, p1_trans, p2, p2_tr
     dy = arrow_length * np.sin(angle_radians)
 
     # Draw the arrow
-    axes[0].arrow(center_x, center_y, dx, -dy, head_width=0.5, head_length=0.5, fc='blue', ec='blue')
+    axes[0].arrow(center_x, center_y, dx, -dy, head_width=3, head_length=3, fc='blue', ec='blue')
 
-    axes[0].plot(p1[0], p1[1], 'bo')
-    axes[0].plot(p2[0], p2[1], 'ro')
-    axes[0].plot([p[0] for p in path_points], [p[1] for p in path_points], color=first_color)
-    if conflict_pos is not None:
-        axes[0].plot(conflict_pos[0], conflict_pos[1], 'ro')
-    axes[0].set_title('Original Grid')
-    #axes[0].axis('off')
+    if len(path_points)>0:
+        axes[0].plot(path_points[0][0], path_points[0][1], 'bo')
+        axes[0].plot(path_points[-1][0], path_points[-1][1], 'ro')
+        axes[0].plot([p[0] for p in path_points], [p[1] for p in path_points], color='green')
+        #axes[0].axis('off')
 
-    axes[1].imshow(rotated, cmap='Greys', interpolation='none')
-    axes[1].invert_yaxis()
-    axes[1].plot(p1_trans[0], p1_trans[1], 'bo')
-    axes[1].plot(p2_trans[0], p2_trans[1], 'ro')
-    axes[1].plot([p[0] for p in path_points_trans], [p[1] for p in path_points_trans], color=second_color)
-    axes[1].set_title('Rotated Grid')
-    #axes[1].axis('off')
+    if len(path_points_trans)>0:
+        axes[1].plot(path_points_trans[0][0], path_points_trans[0][1], 'bo')
+        axes[1].plot(path_points_trans[-1][0], path_points_trans[-1][1], 'ro')
+        axes[1].plot([p[0] for p in path_points_trans], [p[1] for p in path_points_trans], color='green')
+        #axes[1].axis('off')
     
     fig.canvas.mpl_connect('key_press_event', lambda event: on_key_press(event, plt))
 
@@ -87,12 +80,11 @@ def rotate_and_scale(pt, radians, origin, h, w, h_new, w_new):
     qy = offset_y + -sin_rad * adjusted_x + cos_rad * adjusted_y
     xoffset, yoffset = (w_new - w)/2, (h_new - h)/2
     x1_new, y1_new = qx+xoffset, qy+yoffset
-    return int(x1_new), int(y1_new)
+    return x1_new, y1_new
 
 def random_unblocked_point(grid):
     # Find the indices of all unblocked cells
     unblocked_indices = np.argwhere(grid == 0)
-    print(unblocked_indices)
 
     if unblocked_indices.size == 0:
         raise ValueError("No unblocked cells found in the grid.")
@@ -142,6 +134,7 @@ def main():
     h, w = grid.shape[:2]
     h_new, w_new = rotated_grid.shape[:2]
     origin = (w/2, h/2)
+    new_origin = (w_new/2, h_new/2)
 
     #create points
     p1 = random_unblocked_point(grid)#(95, 55)
@@ -165,20 +158,23 @@ def main():
 
     wind_blocked = False
     if(is_within_30_degrees(wind_angle_deg, opposite_angle(angle))):
+        print("Wind blocks direct path")
         wind_blocked = True
 
     path = LinearRaycastPathfindingStrategy.solve(grid, p1, p2)
+    path_trans = [rotate_and_scale(p, map_angle_rad, origin, h, w, h_new, w_new) for p in path]
     collision = False
     if len(path)==0:
+        print("raycast failed")
         collision = True
-    else:
-        #Just for display on rotated grid
-        path = [p1_proj, p2_proj]
 
     if wind_blocked or collision:
-        path = AStarPathfindingStrategy.solve(rotated_grid, p1_proj, p2_proj)
+        print("Running A*")
+        path_trans = AStarPathfindingStrategy.solve(rotated_grid, p1_proj, p2_proj)
+        #un-rotate
+        path = [rotate_and_scale(p, -map_angle_rad, new_origin, h_new, w_new, h, w) for p in path_trans]
     #display
-    display_grids(original=grid, rotated=rotated_grid, wind_angle_degrees=wind_display_angle_deg, p1=p1, p1_trans=p1_proj, p2=p2, p2_trans=p2_proj, path_points=[], path_points_trans=path, conflict=collision)
+    display_grids(original=grid, rotated=rotated_grid, wind_angle_degrees=wind_display_angle_deg, path_points=path, path_points_trans=path_trans)
 
 if __name__ == "__main__":
     main()

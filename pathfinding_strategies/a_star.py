@@ -65,7 +65,10 @@ def turn_penalty(previous, current, next):
 class AStarPathfindingStrategy(PathfindingStrategyInterface):
 
     @staticmethod
-    def solve(map, start, goal) -> list:
+    def solve(map, start, goal, wind_angle_rad=0, no_go_angle_rad=0) -> list:
+        start = int(start[0]), int(start[1])
+        goal = int(goal[0]), int(goal[1])
+
         height, width = map.shape[:2]
         # For node n, cameFrom[n] is the node immediately preceding it on the cheapest path from the start to n currently known.
         cameFrom = {}
